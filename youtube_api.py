@@ -58,6 +58,19 @@ def write_credentials(credentials, filename=OAUTH_CREDENTIALS_FILE):
         pickle.dump(credentials, cfile)
     os.chmod(filename, 0600)
 
+def refresh_token(credentials):
+    import google.auth.transport.requests
+    request = google.auth.transport.requests.Request()
+    try:
+        credentials.refresh(request)
+    except Exception as error:
+        print ('Refresh generated an error: %r' % error)
+        credentials = None
+    else:
+        write_credentials(credentials)
+        print ('Token will expire at %s' % credentials.expiry)
+    return credentials
+
 def youtube_service():
 
     """ Create an authenticated YouTube service object
@@ -74,18 +87,11 @@ def youtube_service():
     # Try to read credentials from file, otherwise ask user for
     # to grant access
     credentials = read_credentials()
-    if credentials is not None and credentials.expired:
-        # Try to refresh the token
-        import google.auth.transport.requests
-        request = google.auth.transport.requests.Request()
-        try:
-            credentials.refresh(request)
-        except Exception as error:
-            print ('Refresh generated an error: %r' % error)
-            credentials = None
-        else:
-            write_credentials(credentials)
-    if credentials is None or not credentials.valid:
+    if credentials is not None:
+        credentials = refresh_token(credentials)
+    if (credentials is None or 
+        not credentials.valid or
+        credentials.expired):
         # Ask the user to authenticate using a browser
         credentials = oauth_flow.run_console()
         write_credentials(credentials)
