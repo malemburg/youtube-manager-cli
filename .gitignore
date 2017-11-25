@@ -107,3 +107,5 @@ env.csh
 pyenv
 Makefile
 *~
+private
+client_secrets.*
