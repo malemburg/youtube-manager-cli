@@ -42,4 +42,3 @@ if __name__ == '__main__':
   channels_list_by_username(service,
       part='snippet,contentDetails,statistics',
       forUsername='GoogleDevelopers')
-quickstart.py
