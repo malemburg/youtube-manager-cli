@@ -1,6 +1,8 @@
+from __future__ import print_function
 
 import os
 import pickle
+import stat
 
 import google.auth.transport.requests
 
@@ -22,9 +24,9 @@ API_VERSION = 'v3'
 
 class YouTubeService(object):
 
-    def __init__(self, credential_filename='', verbose=False):
+    def __init__(self, credentials_filename='', verbose=False):
         self.credentials_filename = (
-            credential_filename or CLIENT_CREDENTIALS_FILE)
+            credentials_filename or CLIENT_CREDENTIALS_FILE)
         self.flow = flow.InstalledAppFlow.from_client_secrets_file(
             CLIENT_SECRETS_FILE, SCOPES)
         self.verbose = verbose
@@ -46,7 +48,7 @@ class YouTubeService(object):
             credentials = self.flow.run_console()
             self.write_credentials(credentials)
             if self.verbose:
-                print ('Token will expire at %s' % credentials.expiry)
+                print('Token will expire at %s' % credentials.expiry)
         return credentials
 
     def refresh_token(self, credentials):
@@ -66,12 +68,13 @@ class YouTubeService(object):
     def write_credentials(self, credentials):
         with open(self.credentials_filename, 'wb') as fobj:
             pickle.dump(credentials, fobj)
-        os.chmod(self.credentials_filename, 0600)
+        os.chmod(self.credentials_filename, stat.S_IRUSR | stat.S_IWUSR)
+        #os.chmod(self.credentials_filename, 0600)
 
     @staticmethod
     def read_credentials():
         try:
-            with open(CLIENT_CREDENTIALS_FILE) as fobj:
+            with open(CLIENT_CREDENTIALS_FILE, 'rb') as fobj:
                 credentials = pickle.load(fobj)
         except (IOError, EOFError):
             credentials = None
