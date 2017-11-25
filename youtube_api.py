@@ -15,13 +15,13 @@ from oauth2client import file
 # Needs to be kept private. See
 # https://developers.google.com/api-client-library/python/guide/aaa_client_secrets
 # for details
-CLIENT_SECRETS_FILE = 'client_secret.json'
+CLIENT_SECRETS_FILE = 'private/client_secret.json'
 
 # Oauth2 credentials files
 #
 # This needs to be kept private. It stores the temporary tokens generated
 # during the OAuth2 authorization process.
-OAUTH_CREDENTIALS_FILE = 'client-oauth.pickle'
+OAUTH_CREDENTIALS_FILE = 'private/client-oauth.pickle'
 
 # Force use of HTTPS for YouTube access, so we can use all available APIs
 SCOPES = ['https://www.googleapis.com/auth/youtube.force-ssl']
