@@ -3,10 +3,15 @@
 """
 import os
 import pickle
+import pprint
+
+# Google APIs
 from googleapiclient import discovery
 #from googleapiclient.errors import HttpError
 from google_auth_oauthlib import flow 
 from oauth2client import file
+
+# Fuzzy matching
 from fuzzywuzzy import fuzz
 
 ### Globals
@@ -131,6 +136,7 @@ def find_channel_id(service, channel_name, min_ratio=75):
         part='snippet',
         type='channel',
         maxResults=5).execute()
+    #pprint.pprint(results)
     items = results['items']
     if not items:
         raise KeyError('No channel found')
@@ -143,9 +149,53 @@ def find_channel_id(service, channel_name, min_ratio=75):
                        (ratio, channel_title))
     return details['channelId']
 
+YT_SEARCH_MAX_RESULTS_LIMIT = 50
+
+def get_channel_video_ids(service, channel_id, max_results=100):
+
+    # Fetch results in pages
+    all_items = []
+    next_page = None
+    while len(all_items) < max_results:
+        get_results = min(max_results - len(all_items),
+                          YT_SEARCH_MAX_RESULTS_LIMIT)
+        if next_page is None:
+            results = service.search().list(
+                q=channel_name,
+                part='id',
+                type='video',
+                maxResults=get_results).execute()
+        else:
+            results = service.search().list(
+                q=channel_name,
+                part='id',
+                type='video',
+                maxResults=get_results,
+                pageToken=next_page).execute()
+        #pprint.pprint(results)
+        all_items.extend(results['items'])
+        next_page = results.get('nextPageToken')
+        if next_page is None:
+            break
+
+    # Extract IDs
+    return [entry['id']['videoId'] for entry in all_items]
+
 ###
 
 if __name__ == '__main__':
+    pp = pprint.pprint
     service = youtube_service()
-    channel_name = raw_input('Channel name: ')
-    print ('Channel ID: %s' % find_channel_id(service, channel_name))
+    if 0:
+        channel_name = raw_input('Channel name: ')
+        channel_id = find_channel_id(service, channel_name)
+    elif 0:
+        channel_name = 'malemburg'
+        channel_id = 'UChBNxhX_IaRXKSp2GHsNhHw'
+    else:
+        channel_name = 'EuroPython Conference'
+        channel_id = 'UC98CzaYuFNAA_gOINFB0e4Q'
+    print ('Channel ID: %s' % channel_id)
+    video_ids = get_channel_video_ids(service, channel_id)
+    print ('Video IDs (%i videos): %r' % (len(video_ids), video_ids))
+
