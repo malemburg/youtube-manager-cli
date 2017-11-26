@@ -49,18 +49,17 @@ class Namespace:
         o.__dict__.update(d)
         for k, v in d.iteritems():
             if isinstance(v, dict):
-                o[k] = Namespace.from_dict(v)
+                o.__dict__[k] = Namespace.from_dict(v)
         return o
 
     def __str__(self):
         return pprint.pformat(self.__dict__)
 
     def __repr__(self):
-        return '%s(keys=%s)' % (
+        return '%s(%s)' % (
             self.__class__.__name__,
             ','.join(self.__dict__.keys()),
             )
-
 
 def read_credentials(filename=OAUTH_CREDENTIALS_FILE):
 
@@ -245,11 +244,51 @@ def update_video_details(service, video_details):
     pprint.pprint(results)
     return results
 
-def update_video_description(service, video_details):
+def get_channel_playlists(service, channel_id, query=None, max_results=100):
 
-    description = video_details['snippet']['description']
-    description += '\n\nTest'
-    video_details['snippet']['description'] = description
+    # Fetch results in pages
+    all_items = []
+    next_page = None
+    while len(all_items) < max_results:
+        get_results = min(max_results - len(all_items),
+                          YT_SEARCH_MAX_RESULTS_LIMIT)
+        results = service.search().list(
+            q=query,
+            channelId=channel_id,
+            part='id,snippet',
+            type='playlist',
+            maxResults=get_results,
+            pageToken=next_page).execute()
+        #pprint.pprint(results)
+        all_items.extend(results['items'])
+        next_page = results.get('nextPageToken')
+        if next_page is None:
+            break
+
+    return [(entry['id']['playlistId'], entry['snippet'])
+            for entry in all_items]
+
+def get_playlist_items(service, playlist_id, max_results=100):
+
+    # Fetch results in pages
+    all_items = []
+    next_page = None
+    while len(all_items) < max_results:
+        get_results = min(max_results - len(all_items),
+                          YT_SEARCH_MAX_RESULTS_LIMIT)
+        results = service.playlistItems().list(
+            playlistId=playlist_id,
+            part='id,snippet,contentDetails',
+            maxResults=get_results,
+            pageToken=next_page).execute()
+        #pprint.pprint(results)
+        all_items.extend(results['items'])
+        next_page = results.get('nextPageToken')
+        if next_page is None:
+            break
+
+    # Extract snippets
+    return [Namespace.from_dict(entry) for entry in all_items]
 
 ###
 
@@ -270,15 +309,29 @@ if __name__ == '__main__':
                                       max_results=10)
     print ('Video IDs (%i videos): %r' % (len(video_ids), video_ids))
 
-    print ('Example video:')
-    video_details = get_video_details(service, 'PwbfHcnkmNs')
-    pp(video_details)
-    
-    update_video_description(service, video_details)
-    video_details['status']['privacyStatus'] = 'public'
-    video_details['snippet']['tags'] += ['pyddf-test']
-    print('With new description:')
-    pp(video_details)
+    if 0:
+        print ('Example video:')
+        video_details = get_video_details(service, 'PwbfHcnkmNs')
+        pp(video_details)
 
-    update_video_details(service, video_details)
+        update_video_description(service, video_details)
+        video_details['snippet']['description'] += '\n\nTest'
+        video_details['status']['privacyStatus'] = 'public'
+        video_details['snippet']['tags'] += ['pyddf-test']
+        print('With new description:')
+        pp(video_details)
 
+        update_video_details(service, video_details)
+
+    print ('Get all channel playlists...')
+    playlists = get_channel_playlists(service, channel_id)
+    pp(playlists)
+    print ('')
+
+    if 0:
+        print ('Get items in a playlist...')
+        playlist_id = 'PL8uoeex94UhG9QAoRICebFpeKK2M0Herh'
+        items = get_playlist_items(service, playlist_id, max_results=1000)
+        print ('Found %i entries' % len(items))
+        pp(items[0])
+        print ('')
