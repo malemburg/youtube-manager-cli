@@ -38,6 +38,30 @@ API_VERSION = 'v3'
 
 ### Helpers
 
+class Namespace:
+
+    """ Namespace container
+
+    """
+    @classmethod
+    def from_dict(class_, d):
+        o = class_()
+        o.__dict__.update(d)
+        for k, v in d.iteritems():
+            if isinstance(v, dict):
+                o[k] = Namespace.from_dict(v)
+        return o
+
+    def __str__(self):
+        return pprint.pformat(self.__dict__)
+
+    def __repr__(self):
+        return '%s(keys=%s)' % (
+            self.__class__.__name__,
+            ','.join(self.__dict__.keys()),
+            )
+
+
 def read_credentials(filename=OAUTH_CREDENTIALS_FILE):
 
     """ Read a credentials file and return the object.
@@ -151,7 +175,7 @@ def find_channel_id(service, channel_name, min_ratio=75):
 
 YT_SEARCH_MAX_RESULTS_LIMIT = 50
 
-def get_channel_video_ids(service, channel_id, max_results=100):
+def get_channel_video_ids(service, channel_id, query=None, max_results=100):
 
     # Fetch results in pages
     all_items = []
@@ -159,19 +183,13 @@ def get_channel_video_ids(service, channel_id, max_results=100):
     while len(all_items) < max_results:
         get_results = min(max_results - len(all_items),
                           YT_SEARCH_MAX_RESULTS_LIMIT)
-        if next_page is None:
-            results = service.search().list(
-                q=channel_name,
-                part='id',
-                type='video',
-                maxResults=get_results).execute()
-        else:
-            results = service.search().list(
-                q=channel_name,
-                part='id',
-                type='video',
-                maxResults=get_results,
-                pageToken=next_page).execute()
+        results = service.search().list(
+            q=query,
+            channelId=channel_id,
+            part='id',
+            type='video',
+            maxResults=get_results,
+            pageToken=next_page).execute()
         #pprint.pprint(results)
         all_items.extend(results['items'])
         next_page = results.get('nextPageToken')
@@ -181,6 +199,58 @@ def get_channel_video_ids(service, channel_id, max_results=100):
     # Extract IDs
     return [entry['id']['videoId'] for entry in all_items]
 
+ALL_VIDEO_PARTS = (
+    'contentDetails',
+    'fileDetails',
+    'id',
+    'liveStreamingDetails',
+    'localizations',
+    'player',
+    'processingDetails',
+    'recordingDetails',
+    'snippet',
+    'statistics',
+    'status',
+    'suggestions',
+    'topicDetails'
+    )
+
+DEFAULT_VIDEO_PARTS = 'snippet,statistics,status,contentDetails'
+
+def get_video_details(service, video_id):
+
+    results = service.videos().list(
+        id=video_id,
+        part=DEFAULT_VIDEO_PARTS,
+        ).execute()
+    #pprint.pprint(results)
+    items = results['items']
+    if not items:
+        raise KeyError('Video with ID %r not found' % video_id)
+    return items[0]
+
+def get_video_details_namespace(service, video_id):
+    details = get_video_details(service, video_id)
+    return Namespace.from_dict(details)
+
+def update_video_details(service, video_details):
+
+    assert video_details['id']
+    # Note: YT complains when passing in a body structure with parts
+    # which are not listed in part.
+    results = service.videos().update(
+        part=DEFAULT_VIDEO_PARTS,
+        body=video_details,
+        ).execute()
+    pprint.pprint(results)
+    return results
+
+def update_video_description(service, video_details):
+
+    description = video_details['snippet']['description']
+    description += '\n\nTest'
+    video_details['snippet']['description'] = description
+
 ###
 
 if __name__ == '__main__':
@@ -189,13 +259,26 @@ if __name__ == '__main__':
     if 0:
         channel_name = raw_input('Channel name: ')
         channel_id = find_channel_id(service, channel_name)
-    elif 0:
+    elif 1:
         channel_name = 'malemburg'
         channel_id = 'UChBNxhX_IaRXKSp2GHsNhHw'
     else:
         channel_name = 'EuroPython Conference'
         channel_id = 'UC98CzaYuFNAA_gOINFB0e4Q'
     print ('Channel ID: %s' % channel_id)
-    video_ids = get_channel_video_ids(service, channel_id)
+    video_ids = get_channel_video_ids(service, channel_id,
+                                      max_results=10)
     print ('Video IDs (%i videos): %r' % (len(video_ids), video_ids))
+
+    print ('Example video:')
+    video_details = get_video_details(service, 'PwbfHcnkmNs')
+    pp(video_details)
+    
+    update_video_description(service, video_details)
+    video_details['status']['privacyStatus'] = 'public'
+    video_details['snippet']['tags'] += ['pyddf-test']
+    print('With new description:')
+    pp(video_details)
+
+    update_video_details(service, video_details)
 
