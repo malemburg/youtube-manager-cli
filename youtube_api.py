@@ -7,6 +7,7 @@ from googleapiclient import discovery
 #from googleapiclient.errors import HttpError
 from google_auth_oauthlib import flow 
 from oauth2client import file
+from fuzzywuzzy import fuzz
 
 ### Globals
 
@@ -59,6 +60,14 @@ def write_credentials(credentials, filename=OAUTH_CREDENTIALS_FILE):
     os.chmod(filename, 0600)
 
 def refresh_token(credentials):
+
+    """ Refresh the token in the credentials.
+
+        This extends the lifetime of the token and is useful when
+        using the command line interface for an extended amount of
+        time.
+
+    """
     import google.auth.transport.requests
     request = google.auth.transport.requests.Request()
     try:
@@ -104,6 +113,7 @@ def youtube_service():
                            credentials=credentials)
 
 def channels_list_by_username(service, **kwargs):
+
     results = service.channels().list(
          part='snippet,contentDetails,statistics',
          forUsername='GoogleDevelopers',
@@ -114,8 +124,28 @@ def channels_list_by_username(service, **kwargs):
          results['items'][0]['snippet']['title'],
          results['items'][0]['statistics']['viewCount']))
 
+def find_channel_id(service, channel_name, min_ratio=75):
+
+    results = service.search().list(
+        q=channel_name,
+        part='snippet',
+        type='channel',
+        maxResults=5).execute()
+    items = results['items']
+    if not items:
+        raise KeyError('No channel found')
+    first_item = items[0]
+    details = first_item['snippet']
+    channel_title = details['channelTitle']
+    ratio = fuzz.partial_ratio(channel_title, channel_name)
+    if ratio < min_ratio:
+        raise KeyError('Channel found, but does not match (ratio=%s): %r' %
+                       (ratio, channel_title))
+    return details['channelId']
+
 ###
 
 if __name__ == '__main__':
     service = youtube_service()
-    channels_list_by_username(service)    
+    channel_name = raw_input('Channel name: ')
+    print ('Channel ID: %s' % find_channel_id(service, channel_name))
