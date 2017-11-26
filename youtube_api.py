@@ -241,7 +241,7 @@ def update_video_details(service, video_details):
         part=DEFAULT_VIDEO_PARTS,
         body=video_details,
         ).execute()
-    pprint.pprint(results)
+    #pprint.pprint(results)
     return results
 
 def get_channel_playlists(service, channel_id, query=None, max_results=100):
