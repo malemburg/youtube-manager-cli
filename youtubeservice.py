@@ -69,7 +69,6 @@ class YouTubeService(object):
         with open(self.credentials_filename, 'wb') as fobj:
             pickle.dump(credentials, fobj)
         os.chmod(self.credentials_filename, stat.S_IRUSR | stat.S_IWUSR)
-        #os.chmod(self.credentials_filename, 0600)
 
     @staticmethod
     def read_credentials():
